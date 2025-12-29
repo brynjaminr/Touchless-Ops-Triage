@@ -1,0 +1,148 @@
+{
+  "name": "Document Extraction Pipeline",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "workflow-trigger",
+      "name": "Called by Email Workflows",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.openai.com/v1/chat/completions",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "openAiApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"gpt-4-turbo\",\n  \"messages\": [\n    {\n      \"role\": \"system\",\n      \"content\": \"Extract invoice data from the provided document. Return ONLY valid JSON. Use the exact schema provided. Only extract text that is clearly visible in the document.\"\n    },\n    {\n      \"role\": \"user\",\n      \"content\": [\n        {\n          \"type\": \"text\",\n          \"text\": \"Extract all invoice details from this document and return as JSON with fields: vendorName, invoiceNumber, invoiceDate, dueDate, totalAmount, currency, lineItems (array of {description, quantity, unitPrice, amount}), paymentTerms, purchaseOrderNumber.\"\n        },\n        {\n          \"type\": \"image_url\",\n          \"image_url\": {\n            \"url\": \"data:image/pdf;base64,{{$json.attachmentData}}\"\n          }\n        }\n      ]\n    }\n  ],\n  \"response_format\": { \"type\": \"json_object\" },\n  \"temperature\": 0.1\n}",
+        "options": {
+          "retry": {
+            "maxRetries": 2,
+            "retryDelay": 2000
+          }
+        }
+      },
+      "id": "extract-with-ai",
+      "name": "Extract Invoice Data (GPT-4)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [450, 300]
+    },
+    {
+      "parameters": {
+        "functionCode": "const response = $input.first().json;\nconst extractedData = JSON.parse(response.choices[0].message.content);\n\nreturn {\n  json: {\n    vendorName: extractedData.vendorName,\n    invoiceNumber: extractedData.invoiceNumber,\n    invoiceDate: extractedData.invoiceDate,\n    dueDate: extractedData.dueDate,\n    totalAmount: parseFloat(extractedData.totalAmount),\n    currency: extractedData.currency || 'USD',\n    lineItems: extractedData.lineItems || [],\n    extractedData: extractedData,\n    emailId: $('Called by Email Workflows').item.json.emailId\n  }\n};"
+      },
+      "id": "parse-extraction",
+      "name": "Parse Extraction Result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [650, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{$json.vendorName}}",
+              "operation": "isEmpty"
+            }
+          ]
+        }
+      },
+      "id": "extraction-valid",
+      "name": "Extraction Valid?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [850, 300]
+    },
+    {
+      "parameters": {
+        "workflowId": "={{process.env.WORKFLOW_ID_MATCHING}}"
+      },
+      "id": "trigger-matching",
+      "name": "Trigger Matching & Routing",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1,
+      "position": [1050, 200]
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "={{process.env.BACKEND_URL}}/api/emails/{{$json.emailId}}/processed",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"error\": \"Failed to extract invoice data\"\n}",
+        "options": {}
+      },
+      "id": "mark-extraction-failed",
+      "name": "Mark Extraction Failed",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [1050, 400]
+    }
+  ],
+  "connections": {
+    "Called by Email Workflows": {
+      "main": [
+        [
+          {
+            "node": "Extract Invoice Data (GPT-4)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Invoice Data (GPT-4)": {
+      "main": [
+        [
+          {
+            "node": "Parse Extraction Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Extraction Result": {
+      "main": [
+        [
+          {
+            "node": "Extraction Valid?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extraction Valid?": {
+      "main": [
+        [
+          {
+            "node": "Mark Extraction Failed",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Trigger Matching & Routing",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [],
+  "triggerCount": 0,
+  "updatedAt": "2025-12-29T00:00:00.000Z",
+  "versionId": "1"
+}

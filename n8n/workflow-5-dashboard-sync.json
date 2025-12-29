@@ -1,0 +1,80 @@
+{
+  "name": "Dashboard Sync API",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 5
+            }
+          ]
+        }
+      },
+      "id": "schedule-trigger",
+      "name": "Every 5 Minutes",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{process.env.BACKEND_URL}}/api/dashboard/summary",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {}
+      },
+      "id": "fetch-summary",
+      "name": "Fetch Dashboard Summary",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [450, 300]
+    },
+    {
+      "parameters": {
+        "functionCode": "// Store in workflow static data for real-time access\nconst data = $input.first().json;\n\n$execution.setCustomData('dashboard', {\n  lastUpdated: new Date().toISOString(),\n  summary: data\n});\n\nreturn { json: data };"
+      },
+      "id": "cache-summary",
+      "name": "Cache Summary",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [650, 300]
+    }
+  ],
+  "connections": {
+    "Every 5 Minutes": {
+      "main": [
+        [
+          {
+            "node": "Fetch Dashboard Summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Dashboard Summary": {
+      "main": [
+        [
+          {
+            "node": "Cache Summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": {
+    "node:Every 5 Minutes": {}
+  },
+  "tags": [],
+  "triggerCount": 1,
+  "updatedAt": "2025-12-29T00:00:00.000Z",
+  "versionId": "1"
+}

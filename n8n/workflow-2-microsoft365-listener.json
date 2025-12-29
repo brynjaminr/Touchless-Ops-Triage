@@ -1,0 +1,168 @@
+{
+  "name": "Inbound Email Listener - Microsoft 365",
+  "nodes": [
+    {
+      "parameters": {
+        "pollTimes": {
+          "item": [
+            {
+              "mode": "everyMinute"
+            }
+          ]
+        },
+        "filters": {
+          "string": [
+            {
+              "field": "subject",
+              "operation": "contains",
+              "value": "invoice"
+            }
+          ]
+        },
+        "options": {
+          "attachmentsIncluded": true
+        }
+      },
+      "id": "microsoft365-trigger",
+      "name": "Microsoft 365 Trigger",
+      "type": "n8n-nodes-base.microsoftOutlookTrigger",
+      "typeVersion": 1,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "functionCode": "const items = [];\n\nfor (const item of $input.all()) {\n  const email = item.json;\n  \n  items.push({\n    json: {\n      tenantId: parseInt(process.env.TENANT_ID),\n      messageId: email.id,\n      fromAddress: email.from.emailAddress.address,\n      subject: email.subject,\n      body: email.bodyPreview,\n      receivedAt: email.receivedDateTime,\n      attachments: email.attachments || []\n    }\n  });\n}\n\nreturn items;"
+      },
+      "id": "transform-email-365",
+      "name": "Transform Email Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [450, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{process.env.BACKEND_URL}}/api/emails/inbound",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{$json}}",
+        "options": {
+          "retry": {
+            "maxRetries": 3,
+            "retryDelay": 1000
+          }
+        }
+      },
+      "id": "store-email-365",
+      "name": "Store Email in Backend",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [650, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{$json.attachments.length}}",
+              "operation": "isNotEmpty"
+            }
+          ]
+        }
+      },
+      "id": "has-attachments-365",
+      "name": "Has Attachments?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [850, 300]
+    },
+    {
+      "parameters": {
+        "workflowId": "={{process.env.WORKFLOW_ID_EXTRACTION}}"
+      },
+      "id": "trigger-extraction-365",
+      "name": "Trigger Document Extraction",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1,
+      "position": [1050, 200]
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "={{process.env.BACKEND_URL}}/api/emails/{{$json.emailId}}/processed",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"error\": \"No attachments found\"\n}",
+        "options": {}
+      },
+      "id": "mark-no-attachments-365",
+      "name": "Mark No Attachments",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [1050, 400]
+    }
+  ],
+  "connections": {
+    "Microsoft 365 Trigger": {
+      "main": [
+        [
+          {
+            "node": "Transform Email Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Transform Email Data": {
+      "main": [
+        [
+          {
+            "node": "Store Email in Backend",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Store Email in Backend": {
+      "main": [
+        [
+          {
+            "node": "Has Attachments?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has Attachments?": {
+      "main": [
+        [
+          {
+            "node": "Trigger Document Extraction",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Mark No Attachments",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [],
+  "triggerCount": 1,
+  "updatedAt": "2025-12-29T00:00:00.000Z",
+  "versionId": "1"
+}

@@ -1,0 +1,280 @@
+{
+  "name": "Matching + Routing (Xero, QBO, NetSuite)",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "workflow-trigger-matching",
+      "name": "Called by Extraction",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1,
+      "position": [250, 400]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{process.env.BACKEND_URL}}/api/tenants/{{$json.tenantId}}/settings",
+        "options": {}
+      },
+      "id": "get-tenant-settings",
+      "name": "Get Tenant Settings",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [450, 400]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{$json.accountingSystem}}",
+              "value2": "xero"
+            },
+            {
+              "value1": "={{$json.accountingSystem}}",
+              "value2": "quickbooks"
+            },
+            {
+              "value1": "={{$json.accountingSystem}}",
+              "value2": "netsuite"
+            }
+          ]
+        },
+        "combineOperation": "any"
+      },
+      "id": "route-by-system",
+      "name": "Route by Accounting System",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 1,
+      "position": [650, 400]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "https://api.xero.com/api.xro/2.0/PurchaseOrders",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "xeroApi",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "where",
+              "value": "=PurchaseOrderNumber==\"{{$('Called by Extraction').item.json.extractedData.purchaseOrderNumber}}\""
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "search-xero-po",
+      "name": "Search Xero PO",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [850, 200]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "https://quickbooks.api.intuit.com/v3/company/{{$credentials.companyId}}/query",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "quickBooksOAuth2Api",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "query",
+              "value": "=SELECT * FROM PurchaseOrder WHERE DocNumber = '{{$('Called by Extraction').item.json.extractedData.purchaseOrderNumber}}'"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "search-qbo-po",
+      "name": "Search QuickBooks PO",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [850, 400]
+    },
+    {
+      "parameters": {
+        "functionCode": "// NetSuite stub - implement with RESTlet or SuiteTalk\nreturn {\n  json: {\n    matched: false,\n    matchConfidence: 0,\n    exceptionReason: \"NetSuite integration pending\"\n  }\n};"
+      },
+      "id": "netsuite-stub",
+      "name": "NetSuite Stub",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [850, 600]
+    },
+    {
+      "parameters": {
+        "functionCode": "const invoiceData = $('Called by Extraction').item.json;\nconst poResult = $input.first().json;\n\nlet matched = false;\nlet matchConfidence = 0;\nlet exceptionReason = null;\nlet matchedPo = null;\n\nif (poResult && poResult.PurchaseOrders && poResult.PurchaseOrders.length > 0) {\n  const po = poResult.PurchaseOrders[0];\n  matchedPo = po.PurchaseOrderNumber;\n  \n  const amountMatch = Math.abs(parseFloat(po.Total) - invoiceData.totalAmount) < 0.01;\n  const vendorMatch = po.Contact.Name.toLowerCase().includes(invoiceData.vendorName.toLowerCase());\n  \n  if (amountMatch && vendorMatch) {\n    matchConfidence = 95;\n    matched = true;\n  } else if (amountMatch || vendorMatch) {\n    matchConfidence = 60;\n    exceptionReason = \"Partial PO match - review required\";\n  } else {\n    matchConfidence = 30;\n    exceptionReason = \"PO found but amount/vendor mismatch\";\n  }\n} else {\n  matchConfidence = 0;\n  exceptionReason = \"No matching PO found\";\n}\n\nreturn {\n  json: {\n    ...invoiceData,\n    matchConfidence,\n    matched,\n    matchedPo,\n    exceptionReason,\n    accountingSystem: 'xero'\n  }\n};"
+      },
+      "id": "calculate-match-xero",
+      "name": "Calculate Match Confidence (Xero)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1050, 200]
+    },
+    {
+      "parameters": {
+        "functionCode": "const invoiceData = $('Called by Extraction').item.json;\nconst poResult = $input.first().json;\n\nlet matched = false;\nlet matchConfidence = 0;\nlet exceptionReason = null;\nlet matchedPo = null;\n\nif (poResult && poResult.QueryResponse && poResult.QueryResponse.PurchaseOrder && poResult.QueryResponse.PurchaseOrder.length > 0) {\n  const po = poResult.QueryResponse.PurchaseOrder[0];\n  matchedPo = po.DocNumber;\n  \n  const amountMatch = Math.abs(parseFloat(po.TotalAmt) - invoiceData.totalAmount) < 0.01;\n  const vendorMatch = po.VendorRef.name.toLowerCase().includes(invoiceData.vendorName.toLowerCase());\n  \n  if (amountMatch && vendorMatch) {\n    matchConfidence = 95;\n    matched = true;\n  } else if (amountMatch || vendorMatch) {\n    matchConfidence = 60;\n    exceptionReason = \"Partial PO match - review required\";\n  } else {\n    matchConfidence = 30;\n    exceptionReason = \"PO found but amount/vendor mismatch\";\n  }\n} else {\n  matchConfidence = 0;\n  exceptionReason = \"No matching PO found\";\n}\n\nreturn {\n  json: {\n    ...invoiceData,\n    matchConfidence,\n    matched,\n    matchedPo,\n    exceptionReason,\n    accountingSystem: 'quickbooks'\n  }\n};"
+      },
+      "id": "calculate-match-qbo",
+      "name": "Calculate Match Confidence (QBO)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1050, 400]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{process.env.BACKEND_URL}}/api/invoices",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{$json}}",
+        "options": {
+          "retry": {
+            "maxRetries": 3,
+            "retryDelay": 1000
+          }
+        }
+      },
+      "id": "create-invoice",
+      "name": "Create Invoice in Backend",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [1250, 400]
+    },
+    {
+      "parameters": {
+        "workflowId": "={{process.env.WORKFLOW_ID_NOTIFICATIONS}}"
+      },
+      "id": "trigger-notifications",
+      "name": "Trigger Notifications",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1,
+      "position": [1450, 400]
+    }
+  ],
+  "connections": {
+    "Called by Extraction": {
+      "main": [
+        [
+          {
+            "node": "Get Tenant Settings",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Tenant Settings": {
+      "main": [
+        [
+          {
+            "node": "Route by Accounting System",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route by Accounting System": {
+      "main": [
+        [
+          {
+            "node": "Search Xero PO",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Search QuickBooks PO",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "NetSuite Stub",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Search Xero PO": {
+      "main": [
+        [
+          {
+            "node": "Calculate Match Confidence (Xero)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Search QuickBooks PO": {
+      "main": [
+        [
+          {
+            "node": "Calculate Match Confidence (QBO)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "NetSuite Stub": {
+      "main": [
+        [
+          {
+            "node": "Create Invoice in Backend",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Calculate Match Confidence (Xero)": {
+      "main": [
+        [
+          {
+            "node": "Create Invoice in Backend",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Calculate Match Confidence (QBO)": {
+      "main": [
+        [
+          {
+            "node": "Create Invoice in Backend",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Invoice in Backend": {
+      "main": [
+        [
+          {
+            "node": "Trigger Notifications",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [],
+  "triggerCount": 0,
+  "updatedAt": "2025-12-29T00:00:00.000Z",
+  "versionId": "1"
+}

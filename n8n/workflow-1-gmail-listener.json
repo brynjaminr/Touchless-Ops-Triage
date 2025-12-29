@@ -1,0 +1,176 @@
+{
+  "name": "Inbound Email Listener - Gmail",
+  "nodes": [
+    {
+      "parameters": {
+        "pollTimes": {
+          "item": [
+            {
+              "mode": "everyMinute"
+            }
+          ]
+        },
+        "simple": false,
+        "filters": {
+          "labelIds": ["INBOX"],
+          "q": "has:attachment subject:(invoice OR bill)"
+        }
+      },
+      "id": "gmail-trigger",
+      "name": "Gmail Trigger",
+      "type": "n8n-nodes-base.gmailTrigger",
+      "typeVersion": 1,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "functionCode": "const items = [];\n\nfor (const item of $input.all()) {\n  const email = item.json;\n  \n  items.push({\n    json: {\n      tenantId: parseInt(process.env.TENANT_ID),\n      messageId: email.id,\n      fromAddress: email.from,\n      subject: email.subject,\n      body: email.textPlain || email.textHtml,\n      receivedAt: email.internalDate,\n      attachments: email.attachments || []\n    }\n  });\n}\n\nreturn items;"
+      },
+      "id": "transform-email",
+      "name": "Transform Email Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [450, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{process.env.BACKEND_URL}}/api/emails/inbound",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameter": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "=",
+              "value": "={{$json}}"
+            }
+          ]
+        },
+        "options": {
+          "retry": {
+            "maxRetries": 3,
+            "retryDelay": 1000
+          }
+        }
+      },
+      "id": "store-email",
+      "name": "Store Email in Backend",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [650, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{$json.attachments.length}}",
+              "operation": "isNotEmpty"
+            }
+          ]
+        }
+      },
+      "id": "has-attachments",
+      "name": "Has Attachments?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [850, 300]
+    },
+    {
+      "parameters": {
+        "workflowId": "={{process.env.WORKFLOW_ID_EXTRACTION}}"
+      },
+      "id": "trigger-extraction",
+      "name": "Trigger Document Extraction",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1,
+      "position": [1050, 200]
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "={{process.env.BACKEND_URL}}/api/emails/{{$json.emailId}}/processed",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"error\": \"No attachments found\"\n}",
+        "options": {}
+      },
+      "id": "mark-no-attachments",
+      "name": "Mark No Attachments",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [1050, 400]
+    }
+  ],
+  "connections": {
+    "Gmail Trigger": {
+      "main": [
+        [
+          {
+            "node": "Transform Email Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Transform Email Data": {
+      "main": [
+        [
+          {
+            "node": "Store Email in Backend",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Store Email in Backend": {
+      "main": [
+        [
+          {
+            "node": "Has Attachments?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has Attachments?": {
+      "main": [
+        [
+          {
+            "node": "Trigger Document Extraction",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Mark No Attachments",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [],
+  "triggerCount": 1,
+  "updatedAt": "2025-12-29T00:00:00.000Z",
+  "versionId": "1"
+}

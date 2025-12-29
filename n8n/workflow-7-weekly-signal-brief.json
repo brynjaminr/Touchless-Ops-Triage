@@ -1,0 +1,199 @@
+{
+  "name": "Weekly Signal Brief Generator",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "weeks",
+              "weeksInterval": 1,
+              "triggerAtHour": 9,
+              "triggerAtMinute": 0,
+              "triggerAtDayOfWeek": 1
+            }
+          ]
+        }
+      },
+      "id": "weekly-trigger",
+      "name": "Every Monday 9am",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "functionCode": "const now = new Date();\nconst weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);\n\nreturn {\n  json: {\n    weekStart: weekAgo.toISOString().split('T')[0],\n    weekEnd: now.toISOString().split('T')[0],\n    tenantId: parseInt(process.env.TENANT_ID)\n  }\n};"
+      },
+      "id": "calculate-dates",
+      "name": "Calculate Week Dates",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [450, 300]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{process.env.BACKEND_URL}}/api/reports/metrics",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "tenantId",
+              "value": "={{$json.tenantId}}"
+            },
+            {
+              "name": "weekStart",
+              "value": "={{$json.weekStart}}"
+            },
+            {
+              "name": "weekEnd",
+              "value": "={{$json.weekEnd}}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "fetch-metrics",
+      "name": "Fetch Weekly Metrics",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [650, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.openai.com/v1/chat/completions",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "openAiApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"gpt-4-turbo\",\n  \"messages\": [\n    {\n      \"role\": \"system\",\n      \"content\": \"You are a financial operations analyst. Write a concise, professional weekly summary email for executives. Focus on: trends, exceptions that need attention, and actionable insights. Use clear, business language. Include metrics in context. Format as HTML email body.\"\n    },\n    {\n      \"role\": \"user\",\n      \"content\": \"Generate weekly invoice processing summary for week {{$('Calculate Week Dates').item.json.weekStart}} to {{$('Calculate Week Dates').item.json.weekEnd}}. Metrics: {{JSON.stringify($json)}}. Highlight: 1) Processing volume trends 2) Exception rate and top reasons 3) Any anomalies or patterns 4) Recommendations.\"\n    }\n  ],\n  \"temperature\": 0.3,\n  \"max_tokens\": 800\n}",
+        "options": {}
+      },
+      "id": "generate-narrative",
+      "name": "Generate AI Narrative",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [850, 300]
+    },
+    {
+      "parameters": {
+        "functionCode": "const response = $input.first().json;\nconst narrative = response.choices[0].message.content;\nconst metrics = $('Fetch Weekly Metrics').item.json;\nconst dates = $('Calculate Week Dates').item.json;\n\nreturn {\n  json: {\n    tenantId: dates.tenantId,\n    weekStart: dates.weekStart,\n    weekEnd: dates.weekEnd,\n    metrics: metrics,\n    narrative: narrative\n  }\n};"
+      },
+      "id": "prepare-report",
+      "name": "Prepare Report Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1050, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{process.env.BACKEND_URL}}/api/reports/weekly",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{$json}}",
+        "options": {}
+      },
+      "id": "save-report",
+      "name": "Save Report to Backend",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [1250, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{process.env.BACKEND_URL}}/api/notifications",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"tenantId\": {{$json.tenantId}},\n  \"type\": \"weekly_report\",\n  \"channel\": \"email\",\n  \"recipient\": \"{{process.env.REPORT_RECIPIENT_EMAIL}}\",\n  \"subject\": \"Weekly Invoice Processing Report - {{$json.weekStart}} to {{$json.weekEnd}}\",\n  \"message\": \"{{$json.narrative}}\"\n}",
+        "options": {}
+      },
+      "id": "queue-email",
+      "name": "Queue Email Notification",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [1450, 300]
+    }
+  ],
+  "connections": {
+    "Every Monday 9am": {
+      "main": [
+        [
+          {
+            "node": "Calculate Week Dates",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Calculate Week Dates": {
+      "main": [
+        [
+          {
+            "node": "Fetch Weekly Metrics",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Weekly Metrics": {
+      "main": [
+        [
+          {
+            "node": "Generate AI Narrative",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate AI Narrative": {
+      "main": [
+        [
+          {
+            "node": "Prepare Report Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Report Data": {
+      "main": [
+        [
+          {
+            "node": "Save Report to Backend",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save Report to Backend": {
+      "main": [
+        [
+          {
+            "node": "Queue Email Notification",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": {
+    "node:Every Monday 9am": {}
+  },
+  "tags": [],
+  "triggerCount": 1,
+  "updatedAt": "2025-12-29T00:00:00.000Z",
+  "versionId": "1"
+}
