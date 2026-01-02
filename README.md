@@ -1,372 +1,371 @@
-# Touchless Ops Triage
-## Automated Invoice Processing for 44 Automation
+# Touchless Ops Triage - Complete Automation Product
 
-**Version:** 1.0
-**Status:** Production-Ready
-**Last Updated:** 2025-12-29
+## 🎯 Overview
 
----
+A fully automated invoice processing system for 44 Automation Ltd. This system processes invoices from email to accounting with 70-90% automation using AI extraction and workflow automation.
 
-## What This Is
+## 🏗️ Architecture
 
-A complete, production-ready automation product that processes invoice emails from receipt to accounting system with minimal human intervention.
+### Tech Stack
+- **Backend**: Node.js + TypeScript + Express
+- **Database**: PostgreSQL (Railway)
+- **Automation**: n8n workflows
+- **AI**: OpenAI GPT-4 Vision for invoice extraction
+- **Email**: Gmail API integration
+- **Accounting**: Xero API integration
+- **Hosting**: Railway (backend + database)
 
-**Key Features:**
-- Email monitoring (Gmail & Microsoft 365)
-- AI-powered invoice extraction (GPT-4 Vision)
-- Purchase order matching (Xero & QuickBooks)
-- Exception handling dashboard
-- Weekly executive reports
-- 70-90% touchless processing
+### Components
 
----
+1. **Backend API** (✅ DEPLOYED)
+   - Multi-tenant SaaS architecture
+   - JWT authentication
+   - RESTful endpoints for invoices, users, dashboard
+   - Live URL: `https://touchless-ops-backend-production.up.railway.app`
 
-## Repository Structure
+2. **Database** (✅ DEPLOYED)
+   - PostgreSQL 15 on Railway
+   - Auto-migrations on startup
+   - Tables: tenants, users, invoices
 
+3. **n8n Workflows** (Pending)
+   - Email monitoring workflow
+   - Invoice extraction workflow
+   - Approval routing workflow
+   - Xero sync workflow
+
+4. **Frontend Dashboard** (Pending)
+   - Built with Lovable.dev
+   - Invoice review interface
+   - Analytics dashboard
+   - User management
+
+## 🚀 Deployment Details
+
+### Railway Project
+- **Project**: pleasing-contentment
+- **Environment**: production
+- **Region**: us-west2
+- **Node Version**: 22.11
+
+### Environment Variables
 ```
-/backend          → Single-file Node.js backend (complete API server)
-/n8n              → 7 importable workflow JSONs + setup SOP
-/docs             → All documentation (SOPs, specs, guides)
+PORT=3000
+NODE_ENV=production
+DATABASE_URL=<Railway PostgreSQL connection string>
+JWT_SECRET=a1f2d8e9c4b7a3f1e8d2c9b6a5f4e3d2c1b9a8f7e6d5c4b3a2f1e9d8c7b6a5f4
 ```
 
----
+### Database Schema
 
-## Quick Start
+**Tenants Table**
+- id (serial primary key)
+- domain (unique)
+- company_name
+- settings (jsonb)
+- created_at
 
-### 1. Read the Handover SOP First
+**Users Table**
+- id (serial primary key)
+- tenant_id (foreign key)
+- email (unique)
+- password_hash
+- role
+- created_at
 
-**Start here:** `/docs/HANDOVER-SOP.md`
+**Invoices Table**
+- id (serial primary key)
+- tenant_id (foreign key)
+- invoice_number
+- supplier_name
+- amount
+- currency
+- invoice_date
+- due_date
+- status
+- extracted_data (jsonb)
+- file_url
+- created_at
+- updated_at
 
-This is the master document containing:
-- What the product does
-- Complete build guide (zero to working)
-- Client onboarding process
-- Weekly operations
-- Troubleshooting
+## 🔐 Demo Account
 
-### 2. Deploy Backend
+**Email**: admin@demo.44automation.com
+**Password**: demo123
+**Domain**: demo.44automation.com
 
-```bash
-cd backend
-npm install
-cp .env.example .env
-# Edit .env with your database URL and JWT secret
-npx ts-node server.ts
-```
-
-See `/docs/DEPLOYMENT-SOP.md` for production deployment.
-
-### 3. Import n8n Workflows
-
-Follow `/n8n/N8N-WORKFLOWS-SOP.md` to:
-- Import all 7 workflows
-- Add credentials (Gmail, OpenAI, Xero/QBO)
-- Configure environment variables
-- Activate workflows
-
-### 4. Build Front-End
-
-Follow `/docs/LOVABLE-FRONTEND-SPEC.md` to build dashboard in Lovable.dev
-
-### 5. Test End-to-End
-
-Use `/docs/TESTING-CHECKLIST.md` to verify everything works.
-
----
-
-## Documentation Index
-
-| Document | Purpose | When to Use |
-|----------|---------|-------------|
-| `HANDOVER-SOP.md` | **Master document** - Complete product overview | **Read this first** |
-| `N8N-WORKFLOWS-SOP.md` | Import and configure all 7 n8n workflows | Setting up automation |
-| `LOVABLE-FRONTEND-SPEC.md` | Build dashboard in Lovable.dev | Building front-end |
-| `AI-PROMPTS-SCHEMAS.md` | AI prompts with JSON schemas | Modifying extraction logic |
-| `DEPLOYMENT-SOP.md` | Deploy to production (Railway, Docker, etc.) | Going live |
-| `PILOT-PRICING-SOP.md` | Run pilots and price subscriptions | Sales & onboarding |
-| `TESTING-CHECKLIST.md` | Complete QA checklist | Before deployment |
-
----
-
-## Tech Stack
-
-**Backend:**
-- Node.js + TypeScript
-- Express (API server)
-- PostgreSQL (database)
-- JWT (authentication)
-- bcrypt (password hashing)
-
-**Automation:**
-- n8n (7 workflows)
-- OpenAI GPT-4 Turbo (invoice extraction)
-- Gmail/Microsoft 365 APIs (email monitoring)
-- Xero/QuickBooks APIs (accounting integration)
-
-**Front-End:**
-- React + TypeScript
-- Tailwind CSS
-- Built in Lovable.dev
-
----
-
-## Files Explained
-
-### `/backend/server.ts`
-
-Single file containing:
-- Complete API server
-- Database schema (auto-migration on startup)
-- Authentication (email/password + magic link)
-- Multi-tenant isolation
-- Audit logging
-- All endpoints for invoices, dashboard, notifications
-- Seed data for local testing
-
-**Run with:** `npx ts-node server.ts`
-
-### `/n8n/workflow-*.json`
-
-7 importable n8n workflow JSONs:
-
-1. **Gmail Listener** - Monitors Gmail inbox for invoice emails
-2. **Microsoft 365 Listener** - Monitors Microsoft 365 inbox
-3. **Document Extraction** - Extracts invoice data using GPT-4
-4. **Matching & Routing** - Matches to POs in Xero/QuickBooks
-5. **Dashboard Sync** - Refreshes dashboard cache every 5 minutes
-6. **Notifications** - Sends email/Slack/Teams notifications
-7. **Weekly Signal Brief** - Generates AI-powered weekly reports
-
-Each workflow is copy/paste ready. Import in order (1-7).
-
-### `/docs/*.md`
-
-All SOPs and specifications in plain English, SOP format.
-
----
-
-## API Endpoints Reference
+## 📡 API Endpoints
 
 ### Authentication
+```bash
+POST /api/auth/login
+Content-Type: application/json
 
-- `POST /api/auth/login` - Email/password login
-- `POST /api/auth/magic-link` - Request magic link
-- `POST /api/auth/verify-magic` - Verify magic link token
+{
+  "email": "admin@demo.44automation.com",
+  "password": "demo123",
+  "domain": "demo.44automation.com"
+}
+
+Response:
+{
+  "success": true,
+  "token": "eyJhbGci...",
+  "user": {...}
+}
+```
 
 ### Invoices
-
-- `GET /api/invoices` - List invoices (filtered by tenant)
-- `GET /api/invoices/:id` - Get single invoice
-- `POST /api/invoices` - Create invoice (from n8n)
-- `PATCH /api/invoices/:id` - Update invoice
-- `POST /api/invoices/:id/approve` - Approve invoice
-- `POST /api/invoices/:id/reject` - Reject invoice
-- `POST /api/invoices/:id/paid` - Mark as paid
-
-### Dashboard
-
-- `GET /api/dashboard/summary` - Get stat cards data
-- `GET /api/dashboard/activity` - Get recent audit log
-
-### Admin
-
-- `POST /api/tenants` - Create new tenant
-- `POST /api/users` - Create user for tenant
-- `POST /api/emails/inbound` - Store inbound email (from n8n)
-- `POST /api/notifications` - Queue notification
-- `GET /api/notifications/pending` - Get unsent notifications
-
-### Health
-
-- `GET /health` - Health check (no auth required)
-
-All endpoints (except `/health` and `/api/auth/*`) require JWT Bearer token.
-
----
-
-## Environment Variables
-
-### Backend
-
-```env
-PORT=3000
-DATABASE_URL=postgresql://localhost:5432/touchless_ops
-JWT_SECRET=<64-character-random-hex-string>
-NODE_ENV=development
-```
-
-Generate JWT secret:
 ```bash
-node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+GET /api/invoices
+Authorization: Bearer <token>
+
+Response:
+{
+  "success": true,
+  "invoices": [...]
+}
 ```
 
-### n8n Workflows
+### Dashboard Summary
+```bash
+GET /api/dashboard/summary
+Authorization: Bearer <token>
 
-Set in each workflow's environment settings:
+Response:
+{
+  "success": true,
+  "summary": {
+    "totalInvoices": 15,
+    "pendingApproval": 3,
+    "totalAmount": 45750.00
+  }
+}
+```
 
-- `TENANT_ID` - Client's tenant ID
-- `BACKEND_URL` - Backend API URL (e.g., http://localhost:3000)
-- `WORKFLOW_ID_EXTRACTION` - ID of workflow 3
-- `WORKFLOW_ID_MATCHING` - ID of workflow 4
-- `WORKFLOW_ID_NOTIFICATIONS` - ID of workflow 6
-- `SMTP_FROM` - From email for notifications
-- `REPORT_RECIPIENT_EMAIL` - Email for weekly reports
+### Health Check
+```bash
+GET /health
 
-### Lovable Front-End
+Response:
+{
+  "status": "healthy",
+  "timestamp": "2025-12-30T..."
+}
+```
 
-- `VITE_API_BASE_URL` - Backend API URL
+## 🧪 Testing
 
----
+### Local Testing
+```bash
+# Health check
+curl http://localhost:3000/health
 
-## Local Development
+# Login
+curl -X POST http://localhost:3000/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"admin@demo.44automation.com","password":"demo123","domain":"demo.44automation.com"}'
+```
 
-### 1. Start Backend
+### Production Testing
+```bash
+# Health check
+curl https://touchless-ops-backend-production.up.railway.app/health
 
+# Login
+curl -X POST https://touchless-ops-backend-production.up.railway.app/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"admin@demo.44automation.com","password":"demo123","domain":"demo.44automation.com"}'
+```
+
+## 📁 Project Structure
+
+```
+touchless-ops-triage/
+├── backend/
+│   ├── server.ts          # Main Express server
+│   ├── package.json       # Dependencies
+│   ├── .env              # Environment variables (local)
+│   └── tsconfig.json     # TypeScript config
+├── docker-compose.yml    # Local PostgreSQL setup
+├── .gitignore           # Git ignore rules
+└── README.md            # This file
+```
+
+## 🔧 Local Development
+
+### Prerequisites
+- Node.js 18+ 
+- Docker Desktop (for local PostgreSQL)
+- Git
+
+### Setup Steps
+
+1. **Clone repository**
+```bash
+git clone https://github.com/brynjaminr/touchless-ops-backend.git
+cd touchless-ops-backend
+```
+
+2. **Start PostgreSQL**
+```bash
+docker-compose up -d
+```
+
+3. **Install dependencies**
 ```bash
 cd backend
 npm install
-npm install -g typescript ts-node
+```
+
+4. **Configure environment**
+```bash
 cp .env.example .env
-# Edit .env with database credentials
-npx ts-node server.ts
+# Edit .env with your local settings
 ```
 
-Backend starts on port 3000.
-
-Demo login:
-- Email: `admin@demo.44automation.com`
-- Password: `demo123`
-- Domain: `demo.44automation.com`
-
-### 2. Start PostgreSQL
-
-**Option A: Local**
+5. **Start server**
 ```bash
-brew install postgresql  # macOS
-brew services start postgresql
-createdb touchless_ops
+npm start
 ```
 
-**Option B: Docker**
-```bash
-docker run --name touchless-postgres \
-  -e POSTGRES_PASSWORD=postgres \
-  -e POSTGRES_DB=touchless_ops \
-  -p 5432:5432 -d postgres:15
-```
+Server runs on `http://localhost:3000`
 
-### 3. Import n8n Workflows
+## 🌐 n8n Workflows (To Be Configured)
 
-Use n8n Cloud (n8n.cloud) or self-hosted:
+### Workflow 1: Email Monitor
+- Watches Gmail inbox for new invoices
+- Filters emails with PDF attachments
+- Triggers invoice extraction
 
-```bash
-npm install -g n8n
-n8n start  # Opens on http://localhost:5678
-```
+### Workflow 2: Invoice Extractor
+- Receives PDF from email monitor
+- Calls OpenAI GPT-4 Vision API
+- Extracts: supplier, amount, date, invoice number
+- Saves to database via backend API
 
-Import workflows from `/n8n/workflow-*.json` files.
+### Workflow 3: Approval Router
+- Checks invoice amount thresholds
+- Routes for approval if needed
+- Sends notifications
 
-### 4. Test End-to-End
+### Workflow 4: Xero Sync
+- Creates bill in Xero
+- Attaches invoice PDF
+- Updates status in database
 
-1. Send test email with invoice PDF to configured inbox
-2. Wait 2 minutes
-3. Check n8n executions (all green)
-4. Check backend: `curl http://localhost:3000/api/invoices -H "Authorization: Bearer <token>"`
-5. Invoice should appear
+## 📊 Frontend Dashboard (To Be Built)
 
----
+### Pages
+1. **Login** - Authentication
+2. **Dashboard** - Analytics and metrics
+3. **Invoices** - List and search
+4. **Invoice Detail** - Review and approve
+5. **Settings** - User and company settings
 
-## Production Deployment
+### Tech Stack
+- React (via Lovable.dev)
+- TailwindCSS
+- shadcn/ui components
 
-See `/docs/DEPLOYMENT-SOP.md` for full guide.
+## 🔑 Credentials & Access
 
-**Quick deploy (recommended):**
+### Railway
+- Email: brynjaminr@gmail.com
+- Project: touchless-ops-backend
 
-1. **Backend:** Deploy to Railway.app (auto-deploys from GitHub)
-2. **Database:** Use Railway's PostgreSQL add-on
-3. **n8n:** Use n8n Cloud ($20/mo Pro plan)
-4. **Front-end:** Deploy in Lovable.dev (one-click deploy)
+### n8n
+- URL: https://brynr.app.n8n.cloud
+- Workspace: Personal
 
-Total setup time: 30 minutes.
+### GitHub
+- Repo: https://github.com/brynjaminr/touchless-ops-backend
+- Branch: main
 
----
+### OpenAI
+- API Key: `<stored securely - not in version control>`
 
-## Client Onboarding
+### Email
+- Account: bryn.richards@44automationltd.co.uk
+- Provider: Gmail
 
-See `/docs/HANDOVER-SOP.md` Section E for full onboarding SOP.
+### Accounting
+- System: Xero
+- Company: 44 Automation Ltd
 
-**10-minute onboarding checklist:**
+## 📈 Roadmap
 
-1. Create tenant: `POST /api/tenants`
-2. Create user: `POST /api/users`
-3. Send credentials to client
-4. Onboarding call:
-   - Client logs in
-   - Connect email inbox (Gmail or Microsoft 365)
-   - Connect accounting (Xero or QuickBooks)
-   - Set notification email
-   - Send test invoice
-5. Verify test invoice processes successfully
-6. Client is live
+### Phase 1: Backend (✅ COMPLETE)
+- [x] Database schema
+- [x] REST API endpoints
+- [x] Authentication with JWT
+- [x] Deploy to Railway
+- [x] Test production API
 
----
+### Phase 2: n8n Workflows (Next)
+- [ ] Configure email monitoring
+- [ ] Set up OpenAI integration
+- [ ] Build invoice extraction workflow
+- [ ] Integrate with backend API
+- [ ] Test end-to-end flow
 
-## Pricing
+### Phase 3: Frontend Dashboard (Next)
+- [ ] Build with Lovable.dev
+- [ ] Implement authentication
+- [ ] Create invoice list view
+- [ ] Create invoice detail view
+- [ ] Add approval functionality
+- [ ] Deploy to production
 
-See `/docs/PILOT-PRICING-SOP.md` for full pricing guide.
+### Phase 4: Production Launch
+- [ ] Gmail OAuth setup
+- [ ] Xero OAuth setup
+- [ ] Pilot client onboarding
+- [ ] Monitor and optimize
+- [ ] Scale to more clients
 
-**Tiers:**
+## 🆘 Troubleshooting
 
-- **Starter:** $199/mo (up to 100 invoices)
-- **Growth:** $499/mo (up to 500 invoices)
-- **Enterprise:** Custom (unlimited, NetSuite support)
+### Backend Issues
 
-**7-day free pilot** available for qualified leads.
+**Server won't start locally**
+- Check Docker is running: `docker ps`
+- Check PostgreSQL is accessible: `docker logs touchless-postgres`
+- Verify .env file exists and has correct values
 
----
+**Authentication fails**
+- Verify JWT_SECRET matches between environments
+- Check user exists in database
+- Verify password is correct (demo123 for demo account)
 
-## Support
+**Database connection fails**
+- Verify DATABASE_URL is correct
+- Check PostgreSQL is running
+- Verify network connectivity
 
-For implementation questions:
-- Read `/docs/HANDOVER-SOP.md` Section H (Troubleshooting)
-- Check `/docs/TESTING-CHECKLIST.md`
+### Railway Issues
 
-For client support:
-- support@44automation.com
+**Build fails**
+- Check build logs in Railway dashboard
+- Verify package.json has correct dependencies
+- Ensure root directory is set to "backend"
 
----
+**Deploy crashes**
+- Check deployment logs
+- Verify all environment variables are set
+- Ensure DATABASE_URL references Railway Postgres
 
-## Changelog
+**bcrypt errors**
+- Ensure node_modules is not committed to git
+- Railway must run `npm install` on Linux servers
+- Add node_modules to .gitignore
 
-### v1.0 (2025-12-29)
-- Initial production release
-- Complete backend (single-file server)
-- 7 n8n workflows (Gmail, Microsoft 365, extraction, matching, notifications, reports)
-- Front-end spec (Lovable build-ready)
-- Complete documentation suite (8 SOPs)
-- Testing checklist
-- Deployment guides (Railway + Docker)
+## 📞 Support
 
----
+For issues or questions:
+- GitHub Issues: https://github.com/brynjaminr/touchless-ops-backend/issues
+- Email: brynjaminr@gmail.com
 
-## License
+## 📄 License
 
-Proprietary - 44 Automation
-
----
-
-## Next Steps
-
-1. Read `/docs/HANDOVER-SOP.md` (start to finish)
-2. Set up local environment (backend + database)
-3. Import n8n workflows
-4. Test end-to-end with sample invoice
-5. Deploy to production
-6. Onboard first pilot client
-7. Iterate based on feedback
-
----
-
-**Built for 44 Automation by a senior product engineer + n8n architect + Lovable full-stack builder.**
-
-**Status: READY FOR PRODUCTION**
+Proprietary - 44 Automation Ltd
