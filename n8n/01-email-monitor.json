@@ -1,0 +1,201 @@
+{
+  "name": "Invoice Email Monitor",
+  "nodes": [
+    {
+      "parameters": {
+        "pollTimes": {
+          "item": [
+            {
+              "mode": "everyMinute"
+            }
+          ]
+        },
+        "filters": {
+          "includeSpamTrash": false,
+          "labelIds": [],
+          "sender": "",
+          "subject": "",
+          "readStatus": "unread",
+          "attachments": true
+        },
+        "format": "resolved"
+      },
+      "id": "gmail-trigger",
+      "name": "Gmail Trigger",
+      "type": "n8n-nodes-base.gmailTrigger",
+      "typeVersion": 1,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.attachments[0].mimeType }}",
+              "operation": "contains",
+              "value2": "pdf"
+            }
+          ]
+        }
+      },
+      "id": "filter-pdf",
+      "name": "Filter PDF Attachments",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [450, 300]
+    },
+    {
+      "parameters": {
+        "messageId": "={{ $json.id }}",
+        "dataPropertyAttachmentsPrefixName": "attachment_",
+        "downloadAttachments": true
+      },
+      "id": "get-attachment",
+      "name": "Get PDF Attachment",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2,
+      "position": [650, 300]
+    },
+    {
+      "parameters": {
+        "authentication": "oAuth2",
+        "resource": "image",
+        "operation": "analyze",
+        "modelId": "gpt-4-vision-preview",
+        "prompt": "Extract the following information from this invoice:\\n\\n1. Invoice Number\\n2. Supplier/Vendor Name\\n3. Invoice Date\\n4. Due Date\\n5. Total Amount\\n6. Currency\\n7. Line Items (description, quantity, unit price, total)\\n\\nReturn the data in this exact JSON format:\\n{\\n  \"invoiceNumber\": \"\",\\n  \"supplierName\": \"\",\\n  \"invoiceDate\": \"YYYY-MM-DD\",\\n  \"dueDate\": \"YYYY-MM-DD\",\\n  \"totalAmount\": 0.00,\\n  \"currency\": \"GBP\",\\n  \"lineItems\": [\\n    {\\n      \"description\": \"\",\\n      \"quantity\": 0,\\n      \"unitPrice\": 0.00,\\n      \"total\": 0.00\\n    }\\n  ]\\n}",
+        "inputDataFieldName": "data",
+        "options": {
+          "baseURL": "https://api.openai.com/v1"
+        }
+      },
+      "id": "openai-extract",
+      "name": "OpenAI Extract Invoice Data",
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 1,
+      "position": [850, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://touchless-ops-backend-production.up.railway.app/api/invoices",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer YOUR_JWT_TOKEN_HERE"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "invoice_number",
+              "value": "={{ $json.invoiceNumber }}"
+            },
+            {
+              "name": "supplier_name",
+              "value": "={{ $json.supplierName }}"
+            },
+            {
+              "name": "amount",
+              "value": "={{ $json.totalAmount }}"
+            },
+            {
+              "name": "currency",
+              "value": "={{ $json.currency }}"
+            },
+            {
+              "name": "invoice_date",
+              "value": "={{ $json.invoiceDate }}"
+            },
+            {
+              "name": "due_date",
+              "value": "={{ $json.dueDate }}"
+            },
+            {
+              "name": "status",
+              "value": "pending_review"
+            },
+            {
+              "name": "extracted_data",
+              "value": "={{ JSON.stringify($json) }}"
+            },
+            {
+              "name": "file_url",
+              "value": "={{ $node['Get PDF Attachment'].json.attachments[0].url }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "save-to-backend",
+      "name": "Save to Backend API",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [1050, 300]
+    }
+  ],
+  "connections": {
+    "Gmail Trigger": {
+      "main": [
+        [
+          {
+            "node": "Filter PDF Attachments",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter PDF Attachments": {
+      "main": [
+        [
+          {
+            "node": "Get PDF Attachment",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get PDF Attachment": {
+      "main": [
+        [
+          {
+            "node": "OpenAI Extract Invoice Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Extract Invoice Data": {
+      "main": [
+        [
+          {
+            "node": "Save to Backend API",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [],
+  "triggerCount": 1,
+  "updatedAt": "2026-01-02T17:57:00.000Z",
+  "versionId": "1"
+}
