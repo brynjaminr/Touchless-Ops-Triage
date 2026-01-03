@@ -187,8 +187,6 @@ const initDatabase = async () => {
 // ============================================================================
 
 const seedData = async () => {
-  if (process.env.NODE_ENV === 'production') return;
-
   const client = await pool.connect();
   try {
     // Check if demo tenant exists
